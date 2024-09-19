@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func (app *application) readIDParam(r *http.Request) (int64, error) {
@@ -46,12 +47,19 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	// Decode the request body into the target destination.
-	err := json.NewDecoder(r.Body).Decode(dst)
+	maxBytes := 1_048_576
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	err := dec.Decode(dst)
 	if err != nil {
 		// If there is an error during decoding, start the triage...
 		var syntaxError *json.SyntaxError
 		var unmarshalTypeError *json.UnmarshalTypeError
 		var invalidUnmarshalError *json.InvalidUnmarshalError
+		var maxBytesError *http.MaxBytesError
+
 		switch {
 		// Use the errors.As() function to check whether the error has the type
 		// *json.SyntaxError. If it does, then return a plain-english error message
@@ -79,11 +87,25 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 			// instead.
 		case errors.Is(err, io.EOF):
 			return errors.New("body must not be empty")
-			// A json.InvalidUnmarshalError error will be returned if we pass something
-			// that is not a non-nil pointer to Decode(). We catch this and panic,
-			// rather than returning an error to our handler. At the end of this chapter
-			// we'll talk about panicking versus returning errors, and discuss why it's an
-			// appropriate thing to do in this specific situation.
+		// If the JSON contains a field which cannot be mapped to the target destination
+		// then Decode() will now return an error message in the format "json: unknown
+		// field "<name>"" . We check for this, extract the field name from the error,
+		// and interpolate it into our custom error message. Note that there's an open
+		// issue at https://github.com/golang/go/issues/29035 regarding turning this
+		// into a distinct error type in the future.
+		case strings.HasPrefix(err.Error(), "json: unknown field "):
+			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
+			return fmt.Errorf("body contains unknown key %s", fieldName)
+		// Use the errors.As() function to check whether the error has the type
+		// *http.MaxBytesError. If it does, then it means the request body exceeded our
+		// size limit of 1MB and we return a clear error message.
+		case errors.As(err, &maxBytesError):
+			return fmt.Errorf("body must not be larger than %d bytes", maxBytesError.Limit)
+		// A json.InvalidUnmarshalError error will be returned if we pass something
+		// that is not a non-nil pointer to Decode(). We catch this and panic,
+		// rather than returning an error to our handler. At the end of this chapter
+		// we'll talk about panicking versus returning errors, and discuss why it's an
+		// appropriate thing to do in this specific situation.
 		case errors.As(err, &invalidUnmarshalError):
 			panic(err)
 			// For anything else, return the error message as-is.
@@ -91,5 +113,10 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 			return err
 		}
 	}
+	err = dec.Decode(&struct{}{})
+	if err != io.EOF {
+		return errors.New("body must only contain a single JSON value")
+	}
+
 	return nil
 }
