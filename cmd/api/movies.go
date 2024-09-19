@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/notoriouscode97/greenlight/internal/data"
+	"github.com/notoriouscode97/greenlight/internal/validator"
 	"net/http"
 	"time"
 )
@@ -29,6 +30,20 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 	if err != nil {
 		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	movie := &data.Movie{
+		Title:   input.Title,
+		Year:    input.Year,
+		Runtime: input.Runtime,
+		Genres:  input.Genres,
+	}
+
+	v := validator.New()
+
+	if data.ValidateMovie(v, movie); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
