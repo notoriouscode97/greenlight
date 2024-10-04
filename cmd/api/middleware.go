@@ -83,7 +83,9 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		// Check to see if the IP address already exists in the map. If it doesn't, then
 		// initialize a new rate limiter and add the IP address and limiter to the map.
 		if _, found := clients[ip]; !found {
-			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
+			clients[ip] = &client{
+				limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst),
+			}
 		}
 
 		// Update the last seen time for the client.
@@ -92,7 +94,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		// Call the Allow() method on the rate limiter for the current IP address. If
 		// the request isn't allowed, unlock the mutex and send a 429 Too Many Requests
 		// response, just like before.
-		if !clients[ip].Allow() {
+		if !clients[ip].limiter.Allow() {
 			mu.Unlock()
 			app.rateLimitExceededResponse(w, r)
 			return
