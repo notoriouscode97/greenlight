@@ -4,10 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	"github.com/notoriouscode97/greenlight/internal/data"
 	"github.com/notoriouscode97/greenlight/internal/jsonlog"
-	"net/http"
 	"os"
 	"time"
 
@@ -81,24 +79,10 @@ func main() {
 		models: data.NewModels(db),
 	}
 
-	// Declare a HTTP server with some sensible timeout settings, which listens on the
-	// port provided in the config struct and uses the servemux we created above as the
-	// handler.
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      app.routes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	err = app.serve()
+	if err != nil {
+		logger.PrintFatal(err, nil)
 	}
-
-	// Start the HTTP server.
-	logger.PrintInfo("starting %s server on %s", map[string]string{
-		"addr": cfg.env,
-		"env":  srv.Addr,
-	})
-	err = srv.ListenAndServe()
-	logger.PrintFatal(err, nil)
 }
 
 func openDB(cfg config) (*sql.DB, error) {
