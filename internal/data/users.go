@@ -175,7 +175,7 @@ func (m UserModel) GetByEmail(email string) (*User, error) {
 
 // Update the details for a specific user. Notice that we check against the version
 // field to help prevent any race conditions during the request cycle, just like we did
-// when updating a movie. And we also check for a violation of the "users
+// when updating a movie. And we also check for a violation of the users
 // constraint when performing the update, just like we did when inserting the user
 // record originally.
 func (m UserModel) Update(user *User) error {
