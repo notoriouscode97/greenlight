@@ -8,6 +8,7 @@ import (
 	"github.com/notoriouscode97/greenlight/internal/jsonlog"
 	"github.com/notoriouscode97/greenlight/internal/mailer"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +37,9 @@ type config struct {
 		username string
 		password string
 		sender   string
+	}
+	cors struct {
+		trustedOrigins []string
 	}
 }
 
@@ -71,6 +75,12 @@ func main() {
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "c8e954a409c062", "SMTP username")
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "3378bbc39c91f8", "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@greenlight.dusandimic.net>", "SMTP sender")
+
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
+
 	flag.Parse()
 
 	// Initialize a new logger which writes messages to the standard out stream,
