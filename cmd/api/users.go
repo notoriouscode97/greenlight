@@ -54,8 +54,8 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
 	if err != nil {
-		return
 		app.serverErrorResponse(w, r, err)
+		return
 	}
 	app.background(func() {
 		data := map[string]any{
